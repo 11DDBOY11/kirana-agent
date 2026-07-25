@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
+import { runTextBillingPipeline } from "@/lib/billing/pipeline";
 import { isValidTwilioSignature } from "@/lib/twilio/signature";
 import { twimlMessage } from "@/lib/twilio/twiml";
 import { detectTextMessageIntent, parseInboundMessage } from "@/lib/whatsapp/inbound";
@@ -65,10 +66,11 @@ export async function POST(request: NextRequest) {
     console.info("[webhook:intent-detected]", { messageSid: inbound.messageSid, intent });
 
     if (intent === "new_bill") {
-      console.info("[webhook:text-bill-queued]", { messageSid: inbound.messageSid });
-      return xmlResponse(
-        "Bill mil gaya. Items aur GST check karke invoice bhej raha hoon. Bill save ho jayega.",
-      );
+      const result = runTextBillingPipeline(inbound.body);
+      if (!result.review.valid) {
+        return xmlResponse("Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye.");
+      }
+      return xmlResponse(result.invoiceText);
     }
 
     return xmlResponse(

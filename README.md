@@ -21,6 +21,14 @@ without using a dashboard.
   detected, and text bill queued. Structured extraction and saving are added in
   the next milestones.
 
+## Shared billing pipeline
+
+Text bills currently use a deterministic, explicitly labelled extraction baseline
+for reliable local testing. The same `runTextBillingPipeline` function is called
+by both `/api/twilio/whatsapp` and `/api/dev/test`; it then applies GST slabs,
+runs the distinct `agentic-review` validation pass, and formats the WhatsApp
+invoice. Voice, photo, and LLM extraction will plug into this shared pipeline.
+
 ## Local setup
 
 1. Copy `.env.example` to `.env.local` and fill `SUPABASE_URL` and
@@ -35,3 +43,11 @@ set `TWILIO_WEBHOOK_BASE_URL` to that public origin, and configure the Sandbox
 
 The remaining integration values are deliberately listed now and are wired in
 later stages: Twilio credentials and `OPENAI_API_KEY`.
+
+## Internal pipeline test page
+
+Open `/dev/test` locally to run the exact text-billing function used by the
+Twilio webhook. It shows extracted data, GST calculation, the separate
+`agentic-review` pass, and the final WhatsApp reply. The page is intentionally
+not linked from the public site. In production, set `DEV_TEST_ACCESS_TOKEN` and
+enter it on the page to use the protected test API.
