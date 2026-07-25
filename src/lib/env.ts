@@ -15,4 +15,10 @@ export const env = {
   get supabaseServiceRoleKey() {
     return required("SUPABASE_SERVICE_ROLE_KEY");
   },
+  get twilioAuthToken() {
+    return required("TWILIO_AUTH_TOKEN");
+  },
+  get twilioWebhookBaseUrl() {
+    return required("TWILIO_WEBHOOK_BASE_URL").replace(/\/$/, "");
+  },
 };
