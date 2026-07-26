@@ -27,7 +27,17 @@ Text bills currently use a deterministic, explicitly labelled extraction baselin
 for reliable local testing. The same `runTextBillingPipeline` function is called
 by both `/api/twilio/whatsapp` and `/api/dev/test`; it then applies GST slabs,
 runs the distinct `agentic-review` validation pass, and formats the WhatsApp
-invoice. Voice, photo, and LLM extraction will plug into this shared pipeline.
+invoice. Voice and photo processing now feed into this shared pipeline; an LLM
+structured extractor for more ambiguous text is the remaining enhancement.
+
+## Stage 4: Voice and photo input
+
+The Twilio webhook now downloads one media attachment using Twilio credentials.
+Audio is sent to OpenAI transcription and bill photos are read by a vision model;
+both outputs flow into the same extraction, GST, review, and invoice functions as
+typed messages. Set `OPENAI_API_KEY`, `TWILIO_ACCOUNT_SID`, and
+`TWILIO_AUTH_TOKEN` before testing media. `/dev/test` remains available for
+text-only local pipeline testing.
 
 ## Local setup
 

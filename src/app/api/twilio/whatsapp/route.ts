@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
 import { runTextBillingPipeline } from "@/lib/billing/pipeline";
+import { downloadTwilioMedia, detectMediaKind, MediaProcessingError } from "@/lib/media/twilio-media";
+import { mediaToBillText } from "@/lib/media/openai-media";
 import { isValidTwilioSignature } from "@/lib/twilio/signature";
 import { twimlMessage } from "@/lib/twilio/twiml";
 import { detectTextMessageIntent, parseInboundMessage } from "@/lib/whatsapp/inbound";
@@ -56,10 +58,25 @@ export async function POST(request: NextRequest) {
     }
 
     if (inbound.mediaCount > 0) {
-      console.info("[webhook:media-deferred]", { messageSid: inbound.messageSid });
-      return xmlResponse(
-        "Photo aur voice note support agle step mein activate ho raha hai. Abhi item aur price text mein bhejiye, jaise: 2kg atta 90rs.",
-      );
+      if (inbound.mediaCount !== 1 || !inbound.mediaUrl || !inbound.mediaContentType) {
+        return xmlResponse("Ek time par sirf ek photo ya voice note bhejiye.");
+      }
+      const kind = detectMediaKind(inbound.mediaContentType);
+      console.info("[webhook:media-received]", { messageSid: inbound.messageSid, kind });
+      const bytes = await downloadTwilioMedia(inbound.mediaUrl);
+      const rawBillText = await mediaToBillText({ kind, bytes, contentType: inbound.mediaContentType });
+      console.info("[webhook:media-extracted]", { messageSid: inbound.messageSid, kind, transcriptLength: rawBillText.length });
+      let result: ReturnType<typeof runTextBillingPipeline>;
+      try {
+        result = runTextBillingPipeline(rawBillText);
+      } catch (error) {
+        console.warn("[webhook:media-bill-not-readable]", { messageSid: inbound.messageSid, error });
+        return xmlResponse("Bill ke items clearly read nahi huye. Kripya clear photo ya voice note dobara bhejiye.");
+      }
+      if (!result.review.valid) {
+        return xmlResponse("Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye.");
+      }
+      return xmlResponse(result.invoiceText);
     }
 
     const intent = detectTextMessageIntent(inbound.body);
@@ -77,6 +94,9 @@ export async function POST(request: NextRequest) {
       "Namaste! Bill text mein bhejiye, jaise: 2kg atta 90rs, 1 soap 60rs. GST aur summary queries bhi jaldi available hongi.",
     );
   } catch (error) {
+    if (error instanceof MediaProcessingError) {
+      return xmlResponse(error.message);
+    }
     console.error("[webhook:failed]", error);
     return xmlResponse(
       "Abhi bill process nahi ho paya. Kripya 1 minute mein dobara bhejiye.",

@@ -5,6 +5,8 @@ export interface InboundWhatsAppMessage {
   body: string;
   mediaCount: number;
   messageSid: string | null;
+  mediaUrl: string | null;
+  mediaContentType: string | null;
 }
 
 export function parseInboundMessage(form: URLSearchParams): InboundWhatsAppMessage {
@@ -13,6 +15,8 @@ export function parseInboundMessage(form: URLSearchParams): InboundWhatsAppMessa
     body: form.get("Body")?.trim() ?? "",
     mediaCount: Number.parseInt(form.get("NumMedia") ?? "0", 10) || 0,
     messageSid: form.get("MessageSid"),
+    mediaUrl: form.get("MediaUrl0"),
+    mediaContentType: form.get("MediaContentType0"),
   };
 }
 
