@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 
 import { env } from "@/lib/env";
-import { runTextBillingPipeline } from "@/lib/billing/pipeline";
+import { runMediaBillingPipeline, runTextBillingPipeline } from "@/lib/billing/pipeline";
+import { answerLedgerQuery, saveInvoice } from "@/lib/ledger/service";
+import { detectIncomingIntent, detectLedgerQuery, isHinglish } from "@/lib/ledger/intent";
 import { downloadTwilioMedia, detectMediaKind, MediaProcessingError } from "@/lib/media/twilio-media";
-import { mediaToBillText } from "@/lib/media/openai-media";
 import { isValidTwilioSignature } from "@/lib/twilio/signature";
 import { twimlMessage } from "@/lib/twilio/twiml";
-import { detectTextMessageIntent, parseInboundMessage } from "@/lib/whatsapp/inbound";
+import { parseInboundMessage } from "@/lib/whatsapp/inbound";
 
 export const runtime = "nodejs";
 
@@ -64,11 +65,9 @@ export async function POST(request: NextRequest) {
       const kind = detectMediaKind(inbound.mediaContentType);
       console.info("[webhook:media-received]", { messageSid: inbound.messageSid, kind });
       const bytes = await downloadTwilioMedia(inbound.mediaUrl);
-      const rawBillText = await mediaToBillText({ kind, bytes, contentType: inbound.mediaContentType });
-      console.info("[webhook:media-extracted]", { messageSid: inbound.messageSid, kind, transcriptLength: rawBillText.length });
-      let result: ReturnType<typeof runTextBillingPipeline>;
+      let result: Awaited<ReturnType<typeof runMediaBillingPipeline>>;
       try {
-        result = runTextBillingPipeline(rawBillText);
+        result = await runMediaBillingPipeline({ kind, bytes, contentType: inbound.mediaContentType });
       } catch (error) {
         console.warn("[webhook:media-bill-not-readable]", { messageSid: inbound.messageSid, error });
         return xmlResponse("Bill ke items clearly read nahi huye. Kripya clear photo ya voice note dobara bhejiye.");
@@ -76,10 +75,11 @@ export async function POST(request: NextRequest) {
       if (!result.review.valid) {
         return xmlResponse("Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye.");
       }
+      await saveInvoice({ phone: inbound.from, rawInputType: kind, result });
       return xmlResponse(result.invoiceText);
     }
 
-    const intent = detectTextMessageIntent(inbound.body);
+    const intent = detectIncomingIntent(inbound.body);
     console.info("[webhook:intent-detected]", { messageSid: inbound.messageSid, intent });
 
     if (intent === "new_bill") {
@@ -87,12 +87,13 @@ export async function POST(request: NextRequest) {
       if (!result.review.valid) {
         return xmlResponse("Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye.");
       }
+      await saveInvoice({ phone: inbound.from, rawInputType: "text", result });
       return xmlResponse(result.invoiceText);
     }
 
-    return xmlResponse(
-      "Namaste! Bill text mein bhejiye, jaise: 2kg atta 90rs, 1 soap 60rs. GST aur summary queries bhi jaldi available hongi.",
-    );
+    const query = detectLedgerQuery(inbound.body);
+    console.info("[webhook:query-detected]", { messageSid: inbound.messageSid, query });
+    return xmlResponse(await answerLedgerQuery({ phone: inbound.from, query, hinglish: isHinglish(inbound.body) }));
   } catch (error) {
     if (error instanceof MediaProcessingError) {
       return xmlResponse(error.message);

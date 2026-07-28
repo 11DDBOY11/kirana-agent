@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
-import { runTextBillingPipeline } from "@/lib/billing/pipeline";
+import { runMediaBillingPipeline, runTextBillingPipeline } from "@/lib/billing/pipeline";
+import { detectMediaKind } from "@/lib/media/twilio-media";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (request.headers.get("content-type")?.includes("multipart/form-data")) {
+      const form = await request.formData();
+      const file = form.get("media");
+      if (!(file instanceof File) || file.size === 0) {
+        return Response.json({ error: "An audio or image file is required." }, { status: 400 });
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        return Response.json({ error: "Choose a file smaller than 25 MB." }, { status: 400 });
+      }
+      const kind = detectMediaKind(file.type);
+      return Response.json(await runMediaBillingPipeline({ kind, bytes: new Uint8Array(await file.arrayBuffer()), contentType: file.type }));
+    }
+
     const payload: unknown = await request.json();
     const text = typeof payload === "object" && payload !== null && "text" in payload ? payload.text : undefined;
     if (typeof text !== "string" || !text.trim()) {
