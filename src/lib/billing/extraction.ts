@@ -10,6 +10,10 @@ function parsePrice(value: string): number {
   return Number.parseFloat(value.replace(/[^0-9.]/g, ""));
 }
 
+function defaultUnitFor(name: string): string {
+  return /\b(atta|flour|rice|chawal|dal|pulse|sugar|cheeni|salt|namak|grain|wheat)\b/i.test(name) ? "kg" : "pc";
+}
+
 /**
  * Text-only baseline extraction. This module is deliberately shared by the
  * WhatsApp webhook and the dev test endpoint; an LLM extractor will replace
@@ -40,7 +44,7 @@ export function extractBillFromText(rawInput: string): ExtractionResult {
     items.push({
       name,
       quantity,
-      unit: unitText?.toLowerCase() ?? "pc",
+      unit: unitText?.toLowerCase() ?? defaultUnitFor(name),
       unit_price: money(total / quantity),
       total: money(total),
     });

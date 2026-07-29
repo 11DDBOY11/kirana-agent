@@ -21,4 +21,9 @@ describe("text billing pipeline", () => {
     const result = runTextBillingPipeline("1 mystery item 100rs");
     expect(result.review.flags).toContain("GST for mystery item defaulted to 5%; please confirm its category.");
   });
+
+  it("defaults loose grain items to kilograms", () => {
+    const result = runTextBillingPipeline("2 rice 100rs");
+    expect(result.extraction.items[0].unit).toBe("kg");
+  });
 });
