@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: "A bill text is required." }, { status: 400 });
     }
 
-    return Response.json(runTextBillingPipeline(text.trim()));
+    return Response.json(await runTextBillingPipeline(text.trim()));
   } catch (error) {
     const message = error instanceof Error ? error.message : "Pipeline failed unexpectedly.";
     console.error("[dev-test:failed]", error);

@@ -9,7 +9,7 @@ export interface ExtractedItem {
 export interface ExtractionResult {
   items: ExtractedItem[];
   subtotal: number;
-  strategy: "deterministic";
+  strategy: "deterministic" | "llm" | "llm-fallback-to-deterministic";
   warnings: string[];
 }
 

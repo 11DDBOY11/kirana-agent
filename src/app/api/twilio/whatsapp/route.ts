@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     console.info("[webhook:intent-detected]", { messageSid: inbound.messageSid, intent });
 
     if (intent === "new_bill") {
-      const result = runTextBillingPipeline(inbound.body);
+      const result = await runTextBillingPipeline(inbound.body);
       if (!result.review.valid) {
         return xmlResponse("Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye.");
       }
