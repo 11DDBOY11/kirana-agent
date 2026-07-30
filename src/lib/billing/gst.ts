@@ -1,12 +1,7 @@
 import type { ExtractedItem, GstResult, TaxedItem } from "@/lib/billing/types";
 
-const GST_KEYWORDS: Array<{ keywords: string[]; rate: number }> = [
-  { keywords: ["soap", "detergent", "shampoo", "toothpaste", "dishwash", "dish soap"], rate: 18 },
-  { keywords: ["cold drink", "aerated", "chips", "pan masala"], rate: 28 },
-  { keywords: ["butter", "ghee", "cheese", "juice"], rate: 12 },
-  { keywords: ["atta", "flour", "rice", "dal", "pulse", "tea", "coffee", "biscuit", "namkeen", "sugar", "salt", "oil"], rate: 5 },
-  { keywords: ["milk", "fresh vegetable", "vegetable", "fruit", "egg"], rate: 0 },
-];
+const STAPLE_KEYWORDS = ["atta", "flour", "rice", "dal", "pulse", "wheat", "chawal", "gehun"];
+const BRANDING_KEYWORDS = ["packaged", "branded", "brand", "pack", "packet", "pkt", "aashirvaad", "fortune", "tata", "daawat", "india gate", "premium"];
 
 function money(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -14,8 +9,34 @@ function money(value: number): number {
 
 export function gstRateForItem(name: string): { rate: number; confidence: "known" | "defaulted" } {
   const normalized = name.toLowerCase();
-  const match = GST_KEYWORDS.find(({ keywords }) => keywords.some((keyword) => normalized.includes(keyword)));
-  return match ? { rate: match.rate, confidence: "known" } : { rate: 5, confidence: "defaulted" };
+
+  // 1. Sin / luxury goods (40%)
+  if (["cold drink", "aerated", "pan masala"].some((kw) => normalized.includes(kw))) {
+    return { rate: 40, confidence: "known" };
+  }
+
+  // 2. Standard goods (18%)
+  if (["soap", "detergent", "shampoo", "toothpaste", "dishwash", "dish soap"].some((kw) => normalized.includes(kw))) {
+    return { rate: 18, confidence: "known" };
+  }
+
+  // 3. Essential daily items / unbranded loose staples (0%)
+  const isMilkOrProduce = ["milk", "fresh vegetable", "vegetable", "fruit", "egg", "tetra-pack", "tetra pack", "uht"].some((kw) => normalized.includes(kw));
+  const isStaple = STAPLE_KEYWORDS.some((kw) => normalized.includes(kw));
+  const isBranded = BRANDING_KEYWORDS.some((kw) => normalized.includes(kw));
+
+  if (isMilkOrProduce || (isStaple && !isBranded)) {
+    return { rate: 0, confidence: "known" };
+  }
+
+  // 4. Low-tier processed goods / branded staples (5%)
+  const isProcessedFive = ["butter", "ghee", "cheese", "juice", "chips", "tea", "coffee", "biscuit", "namkeen", "sugar", "salt", "oil"].some((kw) => normalized.includes(kw));
+  if (isProcessedFive || (isStaple && isBranded)) {
+    return { rate: 5, confidence: "known" };
+  }
+
+  // Default to 5% with defaulted confidence
+  return { rate: 5, confidence: "defaulted" };
 }
 
 export function calculateGst(items: ExtractedItem[]): GstResult {

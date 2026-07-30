@@ -11,11 +11,11 @@ describe("text billing pipeline (deterministic)", () => {
       { name: "dish soap", quantity: 1, unit: "pc", unit_price: 60, total: 60 },
     ]);
     expect(result.extraction.strategy).toBe("deterministic");
-    expect(result.gst.items.map((item) => item.gst_rate)).toEqual([5, 18]);
-    expect(result.gst.gst_total).toBe(15.3);
-    expect(result.gst.grand_total).toBe(165.3);
+    expect(result.gst.items.map((item) => item.gst_rate)).toEqual([0, 18]);
+    expect(result.gst.gst_total).toBe(10.8);
+    expect(result.gst.grand_total).toBe(160.8);
     expect(result.review.valid).toBe(true);
-    expect(result.invoiceText).toContain("Grand Total: ₹165.30");
+    expect(result.invoiceText).toContain("Grand Total: ₹160.80");
   });
 
   it("flags an unknown GST category instead of silently hiding uncertainty", async () => {
@@ -26,6 +26,14 @@ describe("text billing pipeline (deterministic)", () => {
   it("defaults loose grain items to kilograms", async () => {
     const result = await runTextBillingPipeline("2 rice 100rs", { useLlm: false });
     expect(result.extraction.items[0].unit).toBe("kg");
+  });
+
+  it("taxes packaged/branded staples at 5% while loose staples are 0%", async () => {
+    const loose = await runTextBillingPipeline("2kg rice 100rs", { useLlm: false });
+    const branded = await runTextBillingPipeline("2kg premium rice 100rs", { useLlm: false });
+
+    expect(loose.gst.items[0].gst_rate).toBe(0);
+    expect(branded.gst.items[0].gst_rate).toBe(5);
   });
 });
 

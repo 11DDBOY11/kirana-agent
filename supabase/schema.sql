@@ -29,7 +29,7 @@ create table if not exists public.invoice_items (
   quantity numeric(12, 3) not null check (quantity > 0),
   unit text not null default 'pc',
   unit_price numeric(12, 2) not null check (unit_price >= 0),
-  gst_rate numeric(5, 2) not null check (gst_rate in (0, 5, 12, 18, 28)),
+  gst_rate numeric(5, 2) not null check (gst_rate in (0, 5, 18, 40)),
   line_total numeric(12, 2) not null check (line_total >= 0)
 );
 
