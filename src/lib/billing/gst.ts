@@ -1,6 +1,9 @@
 import type { ExtractedItem, GstResult, TaxedItem } from "@/lib/billing/types";
 
-const STAPLE_KEYWORDS = ["atta", "flour", "rice", "dal", "pulse", "wheat", "chawal", "gehun"];
+const STAPLE_KEYWORDS = [
+  "atta", "flour", "rice", "dal", "pulse", "wheat", "chawal", "gehun",
+  "namak", "salt", "cheeni", "shakkar", "sugar", "chai patti", "tea"
+];
 const BRANDING_KEYWORDS = ["packaged", "branded", "brand", "pack", "packet", "pkt", "aashirvaad", "fortune", "tata", "daawat", "india gate", "premium"];
 
 function money(value: number): number {
@@ -11,17 +14,17 @@ export function gstRateForItem(name: string): { rate: number; confidence: "known
   const normalized = name.toLowerCase();
 
   // 1. Sin / luxury goods (40%)
-  if (["cold drink", "aerated", "pan masala"].some((kw) => normalized.includes(kw))) {
+  if (["cold drink", "colddrink", "cold-drink", "thanda", "aerated", "pan masala"].some((kw) => normalized.includes(kw))) {
     return { rate: 40, confidence: "known" };
   }
 
   // 2. Standard goods (18%)
-  if (["soap", "detergent", "shampoo", "toothpaste", "dishwash", "dish soap"].some((kw) => normalized.includes(kw))) {
+  if (["soap", "detergent", "shampoo", "toothpaste", "dishwash", "dish soap", "sabun", "saabun", "detergent powder", "washing powder"].some((kw) => normalized.includes(kw))) {
     return { rate: 18, confidence: "known" };
   }
 
   // 3. Essential daily items / unbranded loose staples (0%)
-  const isMilkOrProduce = ["milk", "fresh vegetable", "vegetable", "fruit", "egg", "tetra-pack", "tetra pack", "uht"].some((kw) => normalized.includes(kw));
+  const isMilkOrProduce = ["milk", "doodh", "fresh vegetable", "vegetable", "fruit", "egg", "tetra-pack", "tetra pack", "uht"].some((kw) => normalized.includes(kw));
   const isStaple = STAPLE_KEYWORDS.some((kw) => normalized.includes(kw));
   const isBranded = BRANDING_KEYWORDS.some((kw) => normalized.includes(kw));
 
@@ -30,7 +33,7 @@ export function gstRateForItem(name: string): { rate: number; confidence: "known
   }
 
   // 4. Low-tier processed goods / branded staples (5%)
-  const isProcessedFive = ["butter", "ghee", "cheese", "juice", "chips", "tea", "coffee", "biscuit", "namkeen", "sugar", "salt", "oil"].some((kw) => normalized.includes(kw));
+  const isProcessedFive = ["butter", "makhan", "ghee", "cheese", "juice", "chips", "coffee", "biscuit", "namkeen", "oil"].some((kw) => normalized.includes(kw));
   if (isProcessedFive || (isStaple && isBranded)) {
     return { rate: 5, confidence: "known" };
   }

@@ -35,6 +35,35 @@ describe("text billing pipeline (deterministic)", () => {
     expect(loose.gst.items[0].gst_rate).toBe(0);
     expect(branded.gst.items[0].gst_rate).toBe(5);
   });
+
+  it("resolves Hindi/Hinglish item names to correct GST rate classes", async () => {
+    const sabun = await runTextBillingPipeline("1 sabun 30rs", { useLlm: false });
+    const saabun = await runTextBillingPipeline("1 saabun 30rs", { useLlm: false });
+    const chawal = await runTextBillingPipeline("2kg chawal 100rs", { useLlm: false });
+    const brandedChawal = await runTextBillingPipeline("2kg packaged chawal 100rs", { useLlm: false });
+    const doodh = await runTextBillingPipeline("1l doodh 60rs", { useLlm: false });
+    const thanda = await runTextBillingPipeline("1 thanda 50rs", { useLlm: false });
+    const makhan = await runTextBillingPipeline("1 makhan 40rs", { useLlm: false });
+
+    // sabun / saabun -> 18%
+    expect(sabun.gst.items[0].gst_rate).toBe(18);
+    expect(sabun.gst.items[0].gst_confidence).toBe("known");
+    expect(saabun.gst.items[0].gst_rate).toBe(18);
+    expect(saabun.gst.items[0].gst_confidence).toBe("known");
+
+    // loose chawal -> 0%, branded chawal -> 5%
+    expect(chawal.gst.items[0].gst_rate).toBe(0);
+    expect(brandedChawal.gst.items[0].gst_rate).toBe(5);
+
+    // doodh -> milk (0%)
+    expect(doodh.gst.items[0].gst_rate).toBe(0);
+
+    // thanda -> cold drink (40%)
+    expect(thanda.gst.items[0].gst_rate).toBe(40);
+
+    // makhan -> dairy butter/ghee (5%)
+    expect(makhan.gst.items[0].gst_rate).toBe(5);
+  });
 });
 
 const hasGroqKey = Boolean(process.env.GROQ_API_KEY);
