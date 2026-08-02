@@ -15,8 +15,12 @@ function headers(extra?: HeadersInit): HeadersInit {
 
 async function supabase<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${env.supabaseUrl.replace(/\/$/, "")}/rest/v1/${path}`, { ...init, headers: headers(init?.headers), cache: "no-store" });
-  if (!response.ok) throw new Error(`Supabase ledger request failed: ${response.status}`);
-  return response.json() as Promise<T>;
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Supabase ledger request failed: ${response.status} - ${errText}`);
+  }
+  const text = await response.text();
+  return (text ? JSON.parse(text) : {}) as T;
 }
 
 function total(rows: InvoiceRow[], field: keyof InvoiceRow): number {
