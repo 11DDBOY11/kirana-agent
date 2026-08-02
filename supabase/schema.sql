@@ -6,7 +6,7 @@ create table if not exists public.shopkeepers (
   phone_number text not null unique,
   name text,
   created_at timestamptz not null default now(),
-  constraint shopkeepers_phone_number_format check (phone_number ~ '^whatsapp:\\+?[0-9]{7,15}$')
+  constraint shopkeepers_phone_number_format check (phone_number ~ '^whatsapp:\+?[0-9]{7,15}$')
 );
 
 create table if not exists public.invoices (
