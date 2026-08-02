@@ -4,7 +4,10 @@ import { env } from "@/lib/env";
 import { MediaProcessingError, type MediaKind } from "@/lib/media/twilio-media";
 
 function client() {
-  return new OpenAI({ apiKey: env.openAiApiKey });
+  return new OpenAI({
+    apiKey: env.groqApiKey,
+    baseURL: "https://api.groq.com/openai/v1",
+  });
 }
 
 function extensionFor(contentType: string): string {
@@ -23,7 +26,7 @@ export async function transcribeVoice(bytes: Uint8Array, contentType: string): P
     const file = await toFile(bytes, `whatsapp-voice.${extensionFor(contentType)}`, { type: contentType });
     const transcription = await client().audio.transcriptions.create({
       file,
-      model: "gpt-4o-transcribe",
+      model: "whisper-large-v3-turbo",
       prompt: "This is an Indian kirana shop bill spoken in Hindi, Hinglish, or English. Preserve item names, quantities, units, and prices.",
     });
     if (!transcription.text?.trim()) throw new Error("Empty transcript");
@@ -38,14 +41,14 @@ export async function readBillPhoto(bytes: Uint8Array, contentType: string): Pro
   try {
     const imageUrl = `data:${contentType};base64,${Buffer.from(bytes).toString("base64")}`;
     const completion = await client().chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "qwen/qwen3.6-27b",
       temperature: 0,
-      max_completion_tokens: 300,
+      max_tokens: 300,
       messages: [{
         role: "user",
         content: [
           { type: "text", text: "Read this Indian kirana bill exactly. Return only a comma-separated list in this format: quantity+unit item name totalRs. Example: 2kg atta 90rs, 1 dish soap 60rs. Do not invent illegible items; omit them." },
-          { type: "image_url", image_url: { url: imageUrl, detail: "high" } },
+          { type: "image_url", image_url: { url: imageUrl } },
         ],
       }],
     });

@@ -34,15 +34,15 @@ describe.skipIf(!hasCredentials)("Ledger Supabase Integration Check", () => {
     const testPhone = "whatsapp:+9999999999";
     const billText = "2kg rice 100rs, 1 dish soap 60rs";
 
-    console.log("=== STEP 1: Running pipeline with useLlm: false ===");
-    console.log("OpenAI API Key Prefix:", process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 12) : "undefined");
-    const pipelineResult = await runTextBillingPipeline(billText, { useLlm: false });
+    console.log("=== STEP 1: Running pipeline with useLlm: true ===");
+    console.log("Groq API Key Prefix:", process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.substring(0, 12) : "undefined");
+    const pipelineResult = await runTextBillingPipeline(billText, { useLlm: true });
     console.log("Extraction Strategy:", pipelineResult.extraction.strategy);
     console.log("Items:", JSON.stringify(pipelineResult.extraction.items, null, 2));
     console.log("GST Total:", pipelineResult.gst.gst_total);
     console.log("Grand Total:", pipelineResult.gst.grand_total);
 
-    expect(pipelineResult.extraction.strategy).toBe("deterministic");
+    expect(pipelineResult.extraction.strategy).toBe("llm");
     expect(pipelineResult.gst.gst_total).toBe(10.8);
     expect(pipelineResult.gst.grand_total).toBe(170.8);
 
@@ -69,5 +69,5 @@ describe.skipIf(!hasCredentials)("Ledger Supabase Integration Check", () => {
 
     expect(queryResponse).toContain("Aaj ka total sales");
     expect(queryResponse).toMatch(/₹\d+\.\d{2} hai/);
-  });
+  }, 30_000);
 });

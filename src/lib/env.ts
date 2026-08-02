@@ -27,4 +27,7 @@ export const env = {
   get openAiApiKey() {
     return required("OPENAI_API_KEY");
   },
+  get groqApiKey() {
+    return required("GROQ_API_KEY");
+  },
 };

@@ -37,10 +37,10 @@ describe("text billing pipeline (deterministic)", () => {
   });
 });
 
-const hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY);
+const hasGroqKey = Boolean(process.env.GROQ_API_KEY);
 
-describe.skipIf(!hasOpenAiKey)("text billing pipeline (LLM integration)", () => {
-  it("extracts items from messy Hinglish input via OpenAI", async () => {
+describe.skipIf(!hasGroqKey)("text billing pipeline (LLM integration)", () => {
+  it("extracts items from messy Hinglish input via Groq", async () => {
     const result = await runTextBillingPipeline("2kg aata 90 rupay, 1 surf excel 60rs");
 
     expect(result.extraction.strategy).toBe("llm");

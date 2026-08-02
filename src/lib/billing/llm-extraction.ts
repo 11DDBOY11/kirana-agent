@@ -5,7 +5,10 @@ import { extractBillFromText } from "@/lib/billing/extraction";
 import type { ExtractedItem, ExtractionResult } from "@/lib/billing/types";
 
 function client() {
-  return new OpenAI({ apiKey: env.openAiApiKey });
+  return new OpenAI({
+    apiKey: env.groqApiKey,
+    baseURL: "https://api.groq.com/openai/v1",
+  });
 }
 
 function money(value: number): number {
@@ -93,9 +96,10 @@ export async function extractBillWithLlm(rawInput: string): Promise<ExtractionRe
 
   try {
     const completion = await client().chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "llama-3.3-70b-versatile",
       temperature: 0,
-      max_completion_tokens: 500,
+      max_tokens: 500,
+      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: rawInput },

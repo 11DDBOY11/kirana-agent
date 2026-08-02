@@ -9,8 +9,8 @@ photo — and receive back a formatted GST invoice saved to a queryable ledger.
 | Input | How it works |
 |-------|-------------|
 | **Text bill** | `2kg atta 90rs, 1 soap 60rs` → LLM extracts items (falls back to deterministic parser) |
-| **Voice note** | OpenAI transcription → same extraction pipeline |
-| **Bill photo** | OpenAI vision reads handwritten bill → same pipeline |
+| **Voice note** | Groq transcription (Whisper-large-v3-turbo) → same extraction pipeline |
+| **Bill photo** | Groq vision (Llama-3.2-11b-vision) reads handwritten bill → same pipeline |
 | **Ledger query** | `Is mahine ka GST kitna hua?` → real totals from Supabase |
 
 The **agentic review** pass validates every invoice (line math, subtotal,
@@ -21,7 +21,7 @@ GST split, grand total) before replying.
 - **Next.js 16** App Router + TypeScript
 - **Supabase** (Postgres) — shopkeepers, invoices, invoice_items
 - **Twilio** — WhatsApp webhook
-- **OpenAI** — transcription (voice), vision (photo), LLM extraction (text)
+- **Groq** — transcription (voice), vision (photo), LLM extraction (text)
 - **Vercel** — deployment
 
 ## Local setup
@@ -50,7 +50,7 @@ cp .env.example .env.local
 | `TWILIO_AUTH_TOKEN` | ✅ | Twilio Auth Token |
 | `TWILIO_WHATSAPP_NUMBER` | ✅ | Your Twilio WhatsApp Sandbox number |
 | `TWILIO_WEBHOOK_BASE_URL` | ✅ | Public HTTPS origin (no trailing slash), e.g. `https://your-app.vercel.app` |
-| `OPENAI_API_KEY` | ✅ | OpenAI API key for transcription, vision, and LLM extraction |
+| `GROQ_API_KEY` | ✅ | Groq API key for transcription, vision, and LLM extraction |
 | `DEV_TEST_ACCESS_TOKEN` | Production only | Protects `/dev/test` in production |
 
 > **Security**: Never prefix secrets with `NEXT_PUBLIC_`. All credentials are
@@ -96,11 +96,11 @@ npm test
 ```
 
 Tests use the deterministic extraction path (`useLlm: false`) and don't
-require an OpenAI key. There is one LLM integration test that runs only
-when `OPENAI_API_KEY` is set — use it for pre-demo validation:
+require a Groq key. There is one LLM integration test that runs only
+when `GROQ_API_KEY` is set — use it for pre-demo validation:
 
 ```bash
-OPENAI_API_KEY=sk-... npm test
+GROQ_API_KEY=gsk_... npm test
 ```
 
 ### Lint
