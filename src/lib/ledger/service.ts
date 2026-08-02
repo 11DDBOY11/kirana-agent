@@ -2,7 +2,7 @@ import "server-only";
 
 import { env } from "@/lib/env";
 import { currentMonthRange, lastSevenDaysRange, todayRange, type DateRange } from "@/lib/ledger/ranges";
-import type { LedgerQueryType } from "@/lib/ledger/intent";
+import type { LedgerQueryType, UserLanguage } from "@/lib/ledger/intent";
 import type { BillingPipelineResult } from "@/lib/billing/types";
 import type { RawInputType } from "@/lib/types";
 
@@ -40,16 +40,55 @@ async function invoicesFor(phone: string, range: DateRange): Promise<InvoiceRow[
   return supabase<InvoiceRow[]>(`invoices?${query.toString()}`);
 }
 
-export async function answerLedgerQuery({ phone, query, hinglish, now = new Date() }: { phone: string; query: LedgerQueryType; hinglish: boolean; now?: Date }): Promise<string> {
-  if (query === "unsupported") return hinglish ? "Main GST is mahine ka, aaj ka total, ya pichle hafte ka summary bata sakta hoon." : "I can answer this month’s GST, today’s total, or a last-7-days summary.";
+export async function answerLedgerQuery({
+  phone,
+  query,
+  hinglish,
+  replyLanguage,
+  now = new Date(),
+}: {
+  phone: string;
+  query: LedgerQueryType;
+  hinglish?: boolean;
+  replyLanguage?: UserLanguage;
+  now?: Date;
+}): Promise<string> {
+  const lang = replyLanguage || (hinglish ? "hinglish" : "english");
+
+  if (query === "unsupported") {
+    if (lang === "kannada") return "ನಾನು ಈ ತಿಂಗಳ ಜಿಎಸ್ಟಿ, ಇವತ್ತಿನ ಒಟ್ಟು ಮಾರಾಟ, ಅಥವಾ ಕಳೆದ 7 ದಿನಗಳ ಸಾರಾಂಶವನ್ನು ಹೇಳಬಲ್ಲೆ.";
+    if (lang === "hinglish") return "Main GST is mahine ka, aaj ka total, ya pichle hafte ka summary bata sakta hoon.";
+    return "I can answer this month’s GST, today’s total, or a last-7-days summary.";
+  }
+
   const range = query === "month_gst" ? currentMonthRange(now) : query === "today_total" ? todayRange(now) : lastSevenDaysRange(now);
   const rows = await invoicesFor(phone, range);
-  if (rows.length === 0) return hinglish ? "Is period ke liye abhi koi saved bill nahi mila." : "No saved bills were found for this period.";
+
+  if (rows.length === 0) {
+    if (lang === "kannada") return "ಈ ಅವಧಿಗೆ ಯಾವುದೇ ಉಳಿಸಲಾದ ಬಿಲ್ಲುಗಳು ಕಂಡುಬಂದಿಲ್ಲ.";
+    if (lang === "hinglish") return "Is period ke liye abhi koi saved bill nahi mila.";
+    return "No saved bills were found for this period.";
+  }
+
   const gst = total(rows, "gst_total");
   const sales = total(rows, "grand_total");
-  if (query === "month_gst") return hinglish ? `Is mahine ka GST ₹${gst.toFixed(2)} hai (${rows.length} bills).` : `This month’s GST is ₹${gst.toFixed(2)} across ${rows.length} bills.`;
-  if (query === "today_total") return hinglish ? `Aaj ka total sales ₹${sales.toFixed(2)} hai (${rows.length} bills).` : `Today’s total sales are ₹${sales.toFixed(2)} across ${rows.length} bills.`;
-  return hinglish ? `Pichle 7 din: ${rows.length} bills, total sales ₹${sales.toFixed(2)}, GST ₹${gst.toFixed(2)}.` : `Last 7 days: ${rows.length} bills, total sales ₹${sales.toFixed(2)}, GST ₹${gst.toFixed(2)}.`;
+
+  if (query === "month_gst") {
+    if (lang === "kannada") return `ಈ ತಿಂಗಳ ಒಟ್ಟು ಜಿಎಸ್ಟಿ ₹${gst.toFixed(2)} ಆಗಿದೆ (${rows.length} ಬಿಲ್ಲುಗಳು).`;
+    if (lang === "hinglish") return `Is mahine ka GST ₹${gst.toFixed(2)} hai (${rows.length} bills).`;
+    return `This month’s GST is ₹${gst.toFixed(2)} across ${rows.length} bills.`;
+  }
+
+  if (query === "today_total") {
+    if (lang === "kannada") return `ಇವತ್ತಿನ ಒಟ್ಟು ಮಾರಾಟ ₹${sales.toFixed(2)} ಆಗಿದೆ (${rows.length} ಬಿಲ್ಲುಗಳು).`;
+    if (lang === "hinglish") return `Aaj ka total sales ₹${sales.toFixed(2)} hai (${rows.length} bills).`;
+    return `Today’s total sales are ₹${sales.toFixed(2)} across ${rows.length} bills.`;
+  }
+
+  // query === "week_summary"
+  if (lang === "kannada") return `ಕಳೆದ 7 ದಿನಗಳು: ${rows.length} ಬಿಲ್ಲುಗಳು, ಒಟ್ಟು ಮಾರಾಟ ₹${sales.toFixed(2)}, ಜಿಎಸ್ಟಿ ₹${gst.toFixed(2)}.`;
+  if (lang === "hinglish") return `Pichle 7 din: ${rows.length} bills, total sales ₹${sales.toFixed(2)}, GST ₹${gst.toFixed(2)}.`;
+  return `Last 7 days: ${rows.length} bills, total sales ₹${sales.toFixed(2)}, GST ₹${gst.toFixed(2)}.`;
 }
 
 export async function saveInvoice({ phone, rawInputType, result }: { phone: string; rawInputType: RawInputType; result: BillingPipelineResult }): Promise<void> {

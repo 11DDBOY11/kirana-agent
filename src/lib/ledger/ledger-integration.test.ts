@@ -70,4 +70,49 @@ describe.skipIf(!hasCredentials)("Ledger Supabase Integration Check", () => {
     expect(queryResponse).toContain("Aaj ka total sales");
     expect(queryResponse).toMatch(/₹\d+\.\d{2} hai/);
   }, 30_000);
+
+  it("extracts Kannada script bill text and queries ledger total in Kannada", async () => {
+    const testPhone = "whatsapp:+8888888888";
+    
+    // 1. Text pipeline extraction
+    console.log("\n=== KANNADA STEP 1: Running pipeline with Kannada script ===");
+    const billText = "೨ ಕೆಜಿ ಅಕ್ಕಿ ೧೦೦ ರೂ, ೧ ಸಾಬೂನು ೬೦ ರೂ";
+    const pipelineResult = await runTextBillingPipeline(billText, { useLlm: true });
+    
+    console.log("Extraction Strategy:", pipelineResult.extraction.strategy);
+    console.log("Items:", JSON.stringify(pipelineResult.extraction.items, null, 2));
+    console.log("GST Total:", pipelineResult.gst.gst_total);
+    console.log("Grand Total:", pipelineResult.gst.grand_total);
+    console.log("Invoice Text:\n" + pipelineResult.invoiceText);
+
+    expect(pipelineResult.extraction.strategy).toBe("llm");
+    // அಕ್ಕಿ (rice) -> 0% GST, ಸಾಬೂನು (soap) -> 18% GST
+    expect(pipelineResult.gst.items.length).toBe(2);
+    expect(pipelineResult.gst.items.find(i => i.name.includes("rice"))?.gst_rate).toBe(0);
+    expect(pipelineResult.gst.items.find(i => i.name.includes("soap"))?.gst_rate).toBe(18);
+
+    // 2. Save invoice
+    console.log("\n=== KANNADA STEP 2: Saving to database ===");
+    await saveInvoice({
+      phone: testPhone,
+      rawInputType: "text",
+      result: pipelineResult
+    });
+    console.log("Invoice successfully saved without errors!");
+
+    // 3. Query ledger
+    console.log("\n=== KANNADA STEP 3: Querying ledger in Kannada ===");
+    const queryResponse = await answerLedgerQuery({
+      phone: testPhone,
+      query: "today_total",
+      replyLanguage: "kannada",
+      now: new Date()
+    });
+
+    console.log("Ledger Response (Kannada):\n" + queryResponse);
+    console.log("=========================================");
+
+    expect(queryResponse).toContain("ಇವತ್ತಿನ ಒಟ್ಟು ಮಾರಾಟ");
+    expect(queryResponse).toMatch(/₹\d+\.\d{2} ಆಗಿದೆ/);
+  }, 30_000);
 });

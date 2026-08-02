@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { runMediaBillingPipeline, runTextBillingPipeline } from "@/lib/billing/pipeline";
 import { answerLedgerQuery, saveInvoice } from "@/lib/ledger/service";
-import { detectIncomingIntent, detectLedgerQuery, isHinglish } from "@/lib/ledger/intent";
+import { detectIncomingIntent, detectLedgerQuery, isHinglish, detectLanguage } from "@/lib/ledger/intent";
 import { downloadTwilioMedia, detectMediaKind, MediaProcessingError } from "@/lib/media/twilio-media";
 import { isValidTwilioSignature } from "@/lib/twilio/signature";
 import { twimlMessage } from "@/lib/twilio/twiml";
@@ -79,13 +79,19 @@ export async function POST(request: NextRequest) {
       return xmlResponse(result.invoiceText);
     }
 
+    const lang = detectLanguage(inbound.body);
     const intent = detectIncomingIntent(inbound.body);
-    console.info("[webhook:intent-detected]", { messageSid: inbound.messageSid, intent });
+    console.info("[webhook:intent-detected]", { messageSid: inbound.messageSid, intent, lang });
 
     if (intent === "new_bill") {
-      const result = await runTextBillingPipeline(inbound.body);
+      const result = await runTextBillingPipeline(inbound.body, { language: lang });
       if (!result.review.valid) {
-        return xmlResponse("Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye.");
+        const errorMsg = lang === "kannada"
+          ? "ಬಿಲ್ಲು ಲೆಕ್ಕದಲ್ಲಿ ಸಮಸ್ಯೆ ಕಂಡುಬಂದಿದೆ. ದಯವಿಟ್ಟು ಪದಾರ್ಥಗಳು ಮತ್ತು ಬೆಲೆಯನ್ನು ಮತ್ತೊಮ್ಮೆ ಕಳುಹಿಸಿ."
+          : lang === "hinglish"
+          ? "Bill mein kuch math issue mila. Kripya items aur price dobara bhejiye."
+          : "There was an issue with the bill calculation. Please send the items and prices again.";
+        return xmlResponse(errorMsg);
       }
       await saveInvoice({ phone: inbound.from, rawInputType: "text", result });
       return xmlResponse(result.invoiceText);
@@ -93,15 +99,19 @@ export async function POST(request: NextRequest) {
 
     const query = detectLedgerQuery(inbound.body);
     console.info("[webhook:query-detected]", { messageSid: inbound.messageSid, query });
-    return xmlResponse(await answerLedgerQuery({ phone: inbound.from, query, hinglish: isHinglish(inbound.body) }));
+    return xmlResponse(await answerLedgerQuery({ phone: inbound.from, query, replyLanguage: lang }));
   } catch (error) {
     if (error instanceof MediaProcessingError) {
       return xmlResponse(error.message);
     }
     console.error("[webhook:failed]", error);
-    return xmlResponse(
-      "Abhi bill process nahi ho paya. Kripya 1 minute mein dobara bhejiye.",
-      500,
-    );
+    const bodyText = (error as any).bodyText || "";
+    const lang = detectLanguage(bodyText);
+    const genericErrorMsg = lang === "kannada"
+      ? "ಬಿಲ್ಲನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು 1 ನಿಮಿಷದ ನಂತರ ಮತ್ತೊಮ್ಮೆ ಕಳುಹಿಸಿ."
+      : lang === "hinglish"
+      ? "Abhi bill process nahi ho paya. Kripya 1 minute mein dobara bhejiye."
+      : "Could not process the bill right now. Please try again in 1 minute.";
+    return xmlResponse(genericErrorMsg, 500);
   }
 }

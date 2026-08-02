@@ -6,6 +6,7 @@ import { reviewInvoice } from "@/lib/billing/review";
 import type { BillingPipelineResult } from "@/lib/billing/types";
 import { mediaToBillText } from "@/lib/media/openai-media";
 import type { MediaKind } from "@/lib/media/twilio-media";
+import { detectLanguage, type UserLanguage } from "@/lib/ledger/intent";
 
 /**
  * The single text-bill pipeline used by both Twilio and /dev/test.
@@ -17,9 +18,11 @@ import type { MediaKind } from "@/lib/media/twilio-media";
  */
 export async function runTextBillingPipeline(
   rawInput: string,
-  { useLlm = true }: { useLlm?: boolean } = {},
+  { useLlm = true, language }: { useLlm?: boolean; language?: UserLanguage } = {},
 ): Promise<BillingPipelineResult> {
   console.info("[pipeline:received]", { inputLength: rawInput.length, useLlm });
+  const detectedLang = language || detectLanguage(rawInput);
+  
   const extraction = useLlm
     ? await extractBillWithLlm(rawInput)
     : extractBillFromText(rawInput);
@@ -28,7 +31,7 @@ export async function runTextBillingPipeline(
   console.info("[pipeline:gst-calculated]", { gstTotal: gst.gst_total });
   const review = reviewInvoice(gst, extraction.warnings);
   console.info("[pipeline:agentic-review]", { valid: review.valid, flags: review.flags.length });
-  const invoiceText = formatInvoice(gst, review.flags);
+  const invoiceText = formatInvoice(gst, review.flags, detectedLang);
   console.info("[pipeline:formatted]");
 
   return { rawInput, extraction, gst, review, invoiceText };
