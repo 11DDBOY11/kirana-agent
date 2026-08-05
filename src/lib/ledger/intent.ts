@@ -2,10 +2,15 @@ export type LedgerQueryType = "month_gst" | "today_total" | "week_summary" | "un
 export type UserLanguage = "english" | "hinglish" | "kannada";
 
 export function detectIncomingIntent(body: string): "new_bill" | "query" {
-  // Support both standard numbers and Kannada numerals (೦-೯)
-  const hasPrice = /(?:₹\s*[\d೦-೯]+(?:\.[\d೦-೯]{1,2})?|[\d೦-೯]+(?:\.[\d೦-೯]{1,2})?\s*(?:rs\.?|inr|₹|ರೂ|ರೂಪಾಯಿ))/i.test(body);
-  const hasQuantity = /\b[\d೦-೯]+(?:\.[\d೦-೯]+)?\s*(?:kg|g|gm|l|lit(?:re|er)?s?|ml|pc|pcs|piece|packet|pkt|ಕೆಜಿ|ಗ್ರಾಂ|ಲೀಟರ್|ಪ್ಯಾಕೆಟ್)?\b/i.test(body);
-  return hasPrice && hasQuantity ? "new_bill" : "query";
+  // Support both standard numbers and Kannada numerals (೦-೯) and explicit currency words (including rupees)
+  const hasPrice = /(?:₹\s*[\d೦-೯]+(?:\.[\d೦-೯]{1,2})?|[\d೦-೯]+(?:\.[\d೦-೯]{1,2})?\s*(?:rs\.?|inr|₹|ರೂ|ರೂಪಾಯಿ|rupees?))/i.test(body);
+  const hasQuantity = /(?:\b|[^a-zA-Z0-9])[\d೦-೯]+(?:\.[\d೦-೯]+)?\s*(?:kg|g|gm|l|lit(?:re|er)?s?|ml|pc|pcs|piece|packet|pkt|ಕೆಜಿ|ಗ್ರಾಂ|ಲೀಟರ್|ಪ್ಯಾಕೆಟ್)?(?:\b|[^a-zA-Z0-9])/i.test(body);
+  
+  // Loosen to allow bare numbers following a quantity+unit pattern
+  const hasQuantityWithUnitAndBarePrice = /[\d೦-೯]+(?:\.[\d೦-೯]+)?\s*(?:kg|g|gm|l|lit(?:re|er)?s?|ml|pc|pcs|piece|packet|pkt|ಕೆಜಿ|ಗ್ರಾಂ|ಲೀಟರ್|ಪ್ಯಾಕೆಟ್)(?:\b|[^a-zA-Z0-9]).*?(?:\b|[^a-zA-Z0-9])[\d೦-೯]+(?:\b|[^a-zA-Z0-9])/i.test(body);
+
+  const isBill = hasPrice || hasQuantityWithUnitAndBarePrice;
+  return isBill && hasQuantity ? "new_bill" : "query";
 }
 
 export function detectLedgerQuery(body: string): LedgerQueryType {

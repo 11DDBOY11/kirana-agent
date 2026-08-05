@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { runMediaBillingPipeline, runTextBillingPipeline } from "@/lib/billing/pipeline";
 import { answerLedgerQuery, saveInvoice } from "@/lib/ledger/service";
-import { detectIncomingIntent, detectLedgerQuery, isHinglish, detectLanguage } from "@/lib/ledger/intent";
+import { detectIncomingIntent, detectLedgerQuery, detectLanguage } from "@/lib/ledger/intent";
 import { downloadTwilioMedia, detectMediaKind, MediaProcessingError } from "@/lib/media/twilio-media";
 import { isValidTwilioSignature } from "@/lib/twilio/signature";
 import { twimlMessage } from "@/lib/twilio/twiml";
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       return xmlResponse(error.message);
     }
     console.error("[webhook:failed]", error);
-    const bodyText = (error as any).bodyText || "";
+    const bodyText = (error as { bodyText?: string })?.bodyText || "";
     const lang = detectLanguage(bodyText);
     const genericErrorMsg = lang === "kannada"
       ? "ಬಿಲ್ಲನ್ನು ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು 1 ನಿಮಿಷದ ನಂತರ ಮತ್ತೊಮ್ಮೆ ಕಳುಹಿಸಿ."

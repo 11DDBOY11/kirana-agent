@@ -30,6 +30,64 @@ import { saveInvoice, answerLedgerQuery } from "@/lib/ledger/service";
 const hasCredentials = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 describe.skipIf(!hasCredentials)("Ledger Supabase Integration Check", () => {
+  it("verifies the e2e 'aaj ka total' scenario and bare-number bill detection", async () => {
+    const testPhone = "whatsapp:+910000000000";
+    const billText = "1 kg sakkare 100";
+
+    // 1. Verify intent detection detects bare number as bill
+    const { detectIncomingIntent } = await import("./intent");
+    const intent = detectIncomingIntent(billText);
+    console.log("\n=== E2E STEP 1: Intent detection check ===");
+    console.log(`Input: "${billText}" | Detected Intent: "${intent}"`);
+    expect(intent).toBe("new_bill");
+
+    // 2. Run text billing pipeline
+    console.log("\n=== E2E STEP 2: Running pipeline for bare-number bill ===");
+    const pipelineResult = await runTextBillingPipeline(billText, { useLlm: true });
+    console.log("Extraction Strategy:", pipelineResult.extraction.strategy);
+    console.log("Items:", JSON.stringify(pipelineResult.extraction.items, null, 2));
+    console.log("Invoice Text:\n" + pipelineResult.invoiceText);
+
+    // 3. Save to database
+    console.log("\n=== E2E STEP 3: Saving to database ===");
+    // Delete any old invoice for this test phone to start fresh
+    const headers = {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    };
+    // Fetch shopkeeper id if exists
+    const skRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/shopkeepers?select=id&phone_number=eq.${encodeURIComponent(testPhone)}`, { headers });
+    const sks = await skRes.json();
+    if (sks.length > 0) {
+      const skId = sks[0].id;
+      // Delete old invoices for clean verification
+      await fetch(`${process.env.SUPABASE_URL}/rest/v1/invoices?shopkeeper_id=eq.${skId}`, { method: "DELETE", headers });
+    }
+
+    await saveInvoice({
+      phone: testPhone,
+      rawInputType: "text",
+      result: pipelineResult
+    });
+    console.log("Invoice successfully saved to database!");
+
+    // 4. Immediately query ledger
+    console.log("\n=== E2E STEP 4: Immediately querying ledger ===");
+    const queryResponse = await answerLedgerQuery({
+      phone: testPhone,
+      query: "today_total",
+      replyLanguage: "hinglish",
+      now: new Date()
+    });
+
+    console.log("Ledger Response (Hinglish):\n" + queryResponse);
+    console.log("=========================================");
+
+    expect(queryResponse).toContain("Aaj ka total sales");
+    expect(queryResponse).toContain("₹100.00"); // 100 sugar (0% GST loose staple)
+    expect(queryResponse).toContain("(1 bills)");
+  }, 30_000);
+
   it("persists invoice with GST 2.0 slabs and queries ledger total", async () => {
     const testPhone = "whatsapp:+9999999999";
     const billText = "2kg rice 100rs, 1 dish soap 60rs";

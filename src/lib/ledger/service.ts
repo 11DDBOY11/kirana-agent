@@ -37,7 +37,7 @@ async function invoicesFor(phone: string, range: DateRange): Promise<InvoiceRow[
   if (!id) return [];
   const query = new URLSearchParams({ select: "subtotal,gst_total,grand_total", shopkeeper_id: `eq.${id}`, created_at: `gte.${range.start.toISOString()}` });
   query.append("created_at", `lt.${range.end.toISOString()}`);
-  return supabase<InvoiceRow[]>(`invoices?${query.toString()}`);
+  return supabase<InvoiceRow[]>(`invoices?${decodeURIComponent(query.toString())}`);
 }
 
 export async function answerLedgerQuery({
